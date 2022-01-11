@@ -1,57 +1,147 @@
 #include <iostream>
 #include <vector>
+#include <string>
 using namespace std;
 
 #define WIDTH 32
 #define HEIGHT 32
 #define SIZE 33*32
 
-//part of Map -> map의 구성요소이다.
-typedef struct Space
+struct Space
 {
+private:
 	bool isEdge;//모서리인지 아닌지.
 	int offset;//map상에서의 offset(position)
 	//vector<Space*> link; //다음 Space 가르키는 주소<
+public:
 	Space* link; //다음 Space 가르키는 주소
 
-	void createSpace(Space* head, Space* prevNode, int offset, char* map,bool isEdge = false)
+	Space(Space* head, Space* prevNode , int offset, bool isEdge = false)
 	{
 		//headnode,prevnode NULL 체크
 		if (head == NULL || prevNode == NULL) exit(1);
 
-		this->isEdge = isEdge; 
+		this->isEdge = isEdge;
 		this->offset = offset;
-
-		prevNode->link = this;
 		link = head;//원형리스트
-
-		drawSpace(offset, map);
 	}
 
-	void drawSpace(int offset, char* map) //offset = array index
+	const int getOffset() const { return offset; };
+};
+
+struct Linker
+{
+private:
+	Space* head;
+
+	enum class Direction {
+		UP,
+		DOWN,
+		RIGHT,
+		LEFT
+	};
+	//대각선 WIDTH * 6;
+	int nextOffset(Direction dir) {
+		switch (dir)
+		{
+		case Direction::UP:
+			return -(WIDTH + 1) * 6;
+		case Direction::DOWN:
+			return (WIDTH + 1) * 6 + 1;
+		case Direction::RIGHT:
+			return 6;
+		case Direction::LEFT:
+			return -6;
+		default:
+			break;
+		}
+	}
+
+	//linking Space node
+	Space* linkSpace(Space* startNode, int endOffset, Direction dir){
+		Space* temp = startNode; //임시 pointer
+		int startOffset = startNode->getOffset() + nextOffset(dir);
+
+		if (dir == Direction::DOWN || dir == Direction::RIGHT) return linkSpace(temp, startOffset, endOffset, dir);
+
+		for (int i = startOffset; endOffset <= i; i += nextOffset(dir))
+		{
+			Space* node = new Space(head, temp, i);
+			temp->link = node;
+			temp = node;
+		}
+
+		return temp; //return lastNode
+	}
+
+	Space* linkSpace(Space* temp, int startOffset, int endOffset, Direction dir) 
 	{
-		int secondline = WIDTH + 1;
-		if(0<= offset && offset<=WIDTH) secondline = WIDTH + 2;
-		map[offset] = '.';
-		map[offset+1] = '.';
-		map[offset+ secondline] = '.';
-		map[offset + secondline + 1] = '.';
-	}
+		//((i==0)?nextOffset(dir): nextOffset(dir)- 1)
+		for (int i = startOffset; i < endOffset; i += nextOffset(dir))
+		{
+			Space* node = new Space(head, temp, i);
+			temp->link = node;
+			temp = node;
+			if (i != 0 && dir == Direction::DOWN) i--;
+		}
 
-	void movePiece(char* map)
+		return temp; //return lastNode
+	}
+public:
+	Linker() :head(new Space(head, head, (WIDTH + 1)* (HEIGHT - 1) - 2))
+	{}
+
+	~Linker() { delete head; }
+
+	Space* getHead()  const  { return head; }
+
+	void linkMapData()
 	{
-		map[offset] = 'C';
+		//edge(0,0) = startPoint
+		head->link = head;
+
+		//rightSide
+		Space* lastSpace = linkSpace(head, WIDTH, Direction::UP);
+
+		//edge(0,1)
+		Space* Edge = new Space(head, lastSpace, lastSpace->getOffset() + nextOffset(Direction::UP) - 1);
+		lastSpace->link = Edge;
+		//upSide
+		lastSpace = linkSpace(Edge, 1, Direction::LEFT);
+
+		//edge(-1,1)
+		Edge = new Space(head, lastSpace, lastSpace->getOffset() + nextOffset(Direction::LEFT));
+		lastSpace->link = Edge;
+		//leftSide
+		lastSpace = linkSpace(Edge, SIZE + nextOffset(Direction::UP), Direction::DOWN);
+
+		//edge(-1,0)
+		Edge = new Space(head, lastSpace, lastSpace->getOffset() + nextOffset(Direction::DOWN) - 1);
+		lastSpace->link = Edge;
+		//downSide
+		lastSpace = linkSpace(Edge, head->getOffset(), Direction::RIGHT);
+
+		return;
 	}
-}Space;
+};
 
-
-typedef struct Map
+struct Map
 {
 private:
 	char* map;
-	Space* head;
-	//draw line of map
-	void drawLine()
+	Linker* linker;
+
+	void setSpaceShape(int offset) //offset = array index
+	{
+		int secondline = WIDTH + 1;
+		if (0 <= offset && offset <= WIDTH) secondline = WIDTH + 2;
+		map[offset] = '.';
+		map[offset + 1] = '.';
+		map[offset + secondline] = '.';
+		map[offset + secondline + 1] = '.';
+	}
+
+	void setLineShape()
 	{
 		//DrawLine
 		int diagcount = 0;//diagonal count
@@ -75,91 +165,121 @@ private:
 		}	
 	}
 
-	//linking Space node
-	void linkSpace(Space* head, Space* startNode) {
-		Space* temp = startNode; //임시 pointer
-
-		for (int i = (WIDTH + 1) * (HEIGHT - 1) - 2 - (WIDTH + 1) * 6; WIDTH < i; i -= (WIDTH + 1) * 6)
-		{
-			Space* node = new Space;
-			node->createSpace(head, temp, i, map);
-			temp = node;
-		}
-	}
-public:
-	Map():map(new char[SIZE + 1]),head(new Space)
+	void setMapShape()
 	{
 		memset(map, ' ', SIZE);
 		map[SIZE] = '\0';
-		drawLine();
-	}
 
-	//함수 내부에서 space들을 link 시킨다.
-	void createMap()
-	{
-		head->createSpace(head, head, (WIDTH + 1) * (HEIGHT - 1) - 2, map);
+		setLineShape();
 
-		linkSpace(head, head);
-
-#if debug
-		for (int i = 6; i < WIDTH - 6; i += 6)
+		Space* temp = linker->getHead();
+		do
 		{
-			//up
-			Space* node = new Space;
-			node->createSpace(head, temp, i, map);
+			setSpaceShape(temp->getOffset());
+			temp = temp->link;
+		} while (temp != linker->getHead());
 
-			//down
-			node = new Space;
-			node->createSpace(head, temp, i + (WIDTH + 1) * (HEIGHT - 2) + 1, map);
-
-			//left
-			node = new Space;
-			node->createSpace(head, temp, (WIDTH + 1) * i + 1, map);
-
-			//right
-			node = new Space;
-			node->createSpace(head, temp, (WIDTH + 1) * (i + 1) - 2, map);
-		}
-#endif	
-		return;
 	}
 
-	char* getMap() { return map; }
-
-	//얘는 말 구조체가 수행해야 할 함수 인 것 같다.
-	void moveNext(int count)
+	friend struct Token;
+public:
+	Map():map(new char[SIZE + 1]),linker(new Linker)
 	{
-		Space* tmp=head;
-		while (1)
-		{
-			printf("OFSSET: %d\n", tmp->offset);
-			if (count == 0)
-			{
-				tmp->movePiece(map);
-				break;
-			}
-			
-			tmp = tmp->link;		
-			count--;
-		}
-
-		
+		linker->linkMapData();
+		setMapShape();	
 	}
+
+	~Map() { delete map; delete linker; }
+
+	char* getMap() const { return map; }
+
+	void setMap(const int offset, const char shape) { map[offset] = shape; }
+
+	const void drawMap() const{ printf("%s", map);}
 };
 
+struct Token {
+	char shape; //말 모양
+	bool active;
+	int localOffset;//말을 업게 될때 예외처리
+	Space* currentSpace;
+public:
+	Token(char shape, Map* map):localOffset(0), shape(shape), active(false)
+	{
+		currentSpace = map->linker->getHead();
+	}
 
+	void moveNext()//다음노드로 이동.
+	{
+		if (!active) active = true;
+		currentSpace = currentSpace->link;
+	}
+
+	const bool isActive() { return active; }
+	const char getShape() const { return shape; }
+	const int getOffset() const { return currentSpace->getOffset() + localOffset; }
+};
+
+struct Player {
+	vector<Token> tokens;
+public:
+	Player(Map* map,char nm1, char nm2, char nm3, char nm4)
+	{
+		tokens.push_back({ nm1,map });
+		tokens.push_back({ nm2,map });
+		tokens.push_back({ nm3,map });
+		tokens.push_back({ nm4,map });
+	}
+
+	void moveToken(string turn)
+	{
+		int index = turn.front() - tokens.front().getShape();//token의 이름
+
+		for (auto data : turn)//B,F 개수 확인
+		{
+			if (data == 'F') tokens[index].moveNext();
+		}
+
+		//개수 많큼 이동 했을 때 말이 겹치는지 확인.겹친다면 localOffset 변경
+	}
+
+	void findValidSpace()
+	{
+
+	}
+
+	const vector<Token> getTokens() const { return tokens; }// read only
+};
 
 int main()
 {
 	int count;
-	Map map = Map();
-	map.createMap();
-	
-	printf("4이하의 숫자 입력\n");
-	scanf("%d", &count);
-	map.moveNext(count);
+	string turn;
 
-	printf("%s", map.getMap());
+	Map* map = new Map;
+	Player* player = new Player(map,'A','B','C','D');
 
-	
+	scanf("%d ", &count);
+
+	while (count != 0)
+	{
+		getline(cin, turn);
+
+		player->moveToken(turn);
+
+		count--;
+	}
+
+	for (auto token : player->getTokens())
+	{
+		if (!token.isActive()) continue;
+		map->setMap(token.getOffset(), token.getShape());
+	}
+
+	map->drawMap();
+
+	delete map;
+	delete player;
+
+	return 0;
 }
