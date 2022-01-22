@@ -2,9 +2,7 @@
 
 #include "FrameWork.h"
 
-#include "Board.h"
-#include "Player.h"
-#include "Map.h"
+#include <memory>
 
 class YutNoriFrameWork : public FrameWork
 {
@@ -16,8 +14,8 @@ protected:
     virtual void MainWorkImpl();
 
 private:
-    Board _Board;
-    Player _Player;
-    Map _Map;
+    std::shared_ptr<class IGraphics> _pGraphics;
+    std::shared_ptr<class IPlayer> _pPlayer;
+    std::shared_ptr<class Board> _pBoard;
 };
 

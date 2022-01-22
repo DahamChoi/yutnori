@@ -1,6 +1,10 @@
-#include "Player.h"
+#include "ConsolePlayer.h"
 
-Player::GameInputValue Player::Input()
+#include <algorithm>
+#include <string>
+#include <iostream>
+
+Task::GameInputValue ConsolePlayer::Input()
 {
     char type;             std::cin >> type;
     std::string strForce;  std::cin >> strForce;

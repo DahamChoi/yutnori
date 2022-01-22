@@ -1,24 +1,36 @@
 #pragma once
 
+#include "IBoard.h"
+#include "IGraphics.h"
+
 #include <vector>
 
-#include "Player.h"
 #include "Node.h"
 
-class Board
+class Board : public ITask, public IBoard
 {
 public:
-    void Init();
+    virtual void Task(const Task::GameInputValue& gameInputValue) override;
+    virtual void DrawBoardUnit(IGraphics* pGraphics) = 0;
 
 public:
-    void Task(const Player::GameInputValue& gameInputValue);
+    Board();
 
 public:
-    const NodePtr& GetNode(int idx);
+    virtual NodePtr MakeNodePtr() = 0;
 
 private:
     void MoveNode(const NodePtr& pNode, const unsigned int eraseBit, const unsigned int orBit);
 
-private:
+protected:
     std::vector<NodePtr> vecNode;
+};
+
+class ConsoleBoard : public Board
+{
+public:
+    virtual NodePtr MakeNodePtr() override;
+
+public:
+    virtual void DrawBoardUnit(IGraphics* pGraphics) override;
 };

@@ -1,14 +1,16 @@
 #include "Board.h"
 
+#include "ConsoleNode.h"
+
 #include <memory>
 #include <cassert>
 
-void Board::Init()
+Board::Board()
 {
     vecNode.reserve(31);
     for (int idx = 0; idx < 31; idx++)
     {
-        vecNode.push_back(std::make_shared<node>());
+        vecNode.push_back(MakeNodePtr());
     }
 
     for (int idx = 0; idx < 20; idx++)
@@ -31,7 +33,7 @@ void Board::Init()
     vecNode[30]->_NextNodeMap[E_NEXT_NODE_TYPE::NORMAL_ROAD] = vecNode[27];
 }
 
-void Board::Task(const Player::GameInputValue& gameInputValue)
+void Board::Task(const Task::GameInputValue& gameInputValue)
 {
     const auto type = gameInputValue.type;
     const auto force = gameInputValue.force;
@@ -63,16 +65,28 @@ void Board::Task(const Player::GameInputValue& gameInputValue)
     (*pUnitNode)->_Unit = 0;
 }
 
-const NodePtr& Board::GetNode(int idx)
-{
-    assert(idx < vecNode.size() && 0 >= idx);
-    return vecNode.at(idx);
-}
-
 void Board::MoveNode(const NodePtr& pNode, const unsigned int eraseBit, const unsigned int orBit)
 {
     if (nullptr == pNode)
         return;
 
     pNode->_Unit = (pNode->_Unit & eraseBit) | orBit;
+}
+
+NodePtr ConsoleBoard::MakeNodePtr()
+{
+    auto ret = std::make_shared<ConsoleNode>();
+    return ret;
+}
+
+void ConsoleBoard::DrawBoardUnit(IGraphics* pGraphics)
+{
+    for (int idx = 1; idx < 30; idx++)
+    {
+        auto pNode = std::dynamic_pointer_cast<ConsoleNode>(vecNode[idx]);
+        if (nullptr != pNode)
+        {
+            pNode->DrawGraphicsObject(pGraphics);
+        }
+    }
 }
